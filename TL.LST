@@ -1,0 +1,309 @@
+     1                                  segment code
+     2                                  ..start:
+     3 00000000 B8[0000]                    mov 	ax,data
+     4 00000003 8ED8                        mov 	ds,ax
+     5 00000005 B8[0000]                    mov 	ax,stack
+     6 00000008 8ED0                        mov 	ss,ax
+     7 0000000A BC[0001]                    mov 	sp,stacktop
+     8 0000000D 31C0                    	XOR 	AX, AX
+     9 0000000F 8EC0                        MOV 	ES, AX
+    10 00000011 26A12000                    MOV     AX, [ES:intr*4];carregou AX com offset anterior
+    11 00000015 A3[0100]                    MOV     [offset_dos], AX        ; offset_dos guarda o end. para qual ip de int 9 estava apontando anteriormente
+    12 00000018 26A12200                    MOV     AX, [ES:intr*4+2]     ; cs_dos guarda o end. anterior de CS
+    13 0000001C A3[0300]                    MOV     [cs_dos], AX
+    14 0000001F FA                          CLI     
+    15 00000020 268C0E2200                  MOV     [ES:intr*4+2], CS
+    16 00000025 26C7062000[6D01]            MOV     WORD [ES:intr*4],relogio
+    17 0000002C FB                          STI
+    18 0000002D E91300                      jmp     desenhar_tela
+    19                                  
+    20                                  print_string:
+    21 00000030 B402                        mov ah, 02h
+    22 00000032 B700                        mov bh, 0
+    23 00000034 CD10                        int 10h
+    24 00000036 B40E                        mov ah, 0Eh
+    25                                  .print_char:
+    26 00000038 AC                          lodsb
+    27 00000039 3C00                        cmp al, 0
+    28 0000003B 7405                        je .done
+    29 0000003D CD10                        int 10h
+    30 0000003F E9F6FF                      jmp .print_char
+    31                                  .done:
+    32 00000042 C3                          ret
+    33                                  
+    34                                  desenhar_tela:
+    35 00000043 B406                        mov ah, 06h
+    36 00000045 30C0                        xor al, al            ; AL = 0 (scroll entire window)
+    37 00000047 B707                        mov bh, 07h           ; BH = attribute (black background, white foreground)
+    38 00000049 31C9                        xor cx, cx            ; CH = 0, CL = 0 (start at upper left corner)
+    39 0000004B B618                        mov dh, 18h           ; DH = 24 (bottom row)
+    40 0000004D B24F                        mov dl, 4Fh           ; DL = 79 (rightmost column)
+    41 0000004F CD10                        int 10h
+    42                                  
+    43 00000051 BE[1400]                    mov si, msg_title
+    44 00000054 B601                        mov dh, 1
+    45 00000056 B20B                        mov dl, 11
+    46 00000058 E8D5FF                      call print_string
+    47                                  
+    48 0000005B BE[4E00]                    mov si, msg_menu
+    49 0000005E B60E                        mov dh, 14
+    50 00000060 B220                        mov dl, 32
+    51 00000062 E8CBFF                      call print_string
+    52                                  
+    53 00000065 BE[5E00]                    mov si, msg_q
+    54 00000068 B610                        mov dh, 16
+    55 0000006A B224                        mov dl, 36
+    56 0000006C E8C1FF                      call print_string
+    57                                  
+    58 0000006F BE[6600]                    mov si, msg_s
+    59 00000072 B611                        mov dh, 17
+    60 00000074 B20D                        mov dl, 13
+    61 00000076 E8B7FF                      call print_string
+    62                                  
+    63 00000079 BE[9C00]                    mov si, msg_m
+    64 0000007C B612                        mov dh, 18
+    65 0000007E B20D                        mov dl, 13
+    66 00000080 E8ADFF                      call print_string
+    67                                  
+    68 00000083 BE[D100]                    mov si, msg_h
+    69 00000086 B613                        mov dh, 19
+    70 00000088 B20F                        mov dl, 15
+    71 0000008A E8A3FF                      call print_string
+    72                                  
+    73                                  l1:
+    74 0000008D 803E[0500]00                cmp 	byte [tique], 0
+    75 00000092 7503                    	jne 	ab
+    76 00000094 E82401                  	call 	converte
+    77 00000097 B40B                    ab: mov 	ah,0bh		
+    78 00000099 CD21                        int 	21h			; Le buffer de teclado
+    79 0000009B 3C00                        cmp 	al,0
+    80 0000009D 7503                        jne 	pressionado
+    81 0000009F E9EBFF                      jmp 	l1
+    82                                  pressionado:
+    83 000000A2 E8BD00                      call    limpar_input_invalido
+    84 000000A5 B408                        mov     ah, 08h
+    85 000000A7 CD21                        int     21h
+    86 000000A9 3C71                        cmp     al, 'q'
+    87 000000AB 740F                        je      fim
+    88 000000AD 3C73                        cmp     al, 's'
+    89 000000AF 7422                        je      tecla_segundo
+    90 000000B1 3C6D                        cmp     al, 'm'
+    91 000000B3 7448                        je      tecla_minuto
+    92 000000B5 3C68                        cmp     al, 'h'
+    93 000000B7 746E                        je      tecla_hora
+    94 000000B9 E9D1FF                      jmp     l1
+    95                                  
+    96                                  fim:
+    97 000000BC FA                      	CLI
+    98 000000BD 31C0                        XOR     AX, AX
+    99 000000BF 8EC0                        MOV     ES, AX
+   100 000000C1 A1[0300]                    MOV     AX, [cs_dos]
+   101 000000C4 26A32200                    MOV     [ES:intr*4+2], AX
+   102 000000C8 A1[0100]                    MOV     AX, [offset_dos]
+   103 000000CB 26A32000                    MOV     [ES:intr*4], AX 
+   104 000000CF B44C                        MOV     AH, 4Ch
+   105 000000D1 CD21                        int     21h
+   106                                  
+   107                                  tecla_segundo:
+   108 000000D3 B408                        mov     ah, 08h
+   109 000000D5 CD21                        int     21h
+   110 000000D7 3C30                        cmp     al, '0'
+   111 000000D9 7C7A                        jl      input_invalido
+   112 000000DB 3C35                        cmp     al, '5'
+   113 000000DD 7F76                        jg      input_invalido
+   114 000000DF 2C30                        sub     al, '0'
+   115 000000E1 B70A                        mov     bh, 10
+   116 000000E3 F6E7                        mul     bh
+   117 000000E5 88C7                        mov     bh, al
+   118 000000E7 B408                        mov     ah, 08h
+   119 000000E9 CD21                        int     21h
+   120 000000EB 3C30                        cmp     al, '0'
+   121 000000ED 7C66                        jl      input_invalido
+   122 000000EF 3C39                        cmp     al, '9'
+   123 000000F1 7F62                        jg      input_invalido
+   124 000000F3 2C30                        sub     al, '0'
+   125 000000F5 00F8                        add     al, bh
+   126 000000F7 A2[0600]                    mov     byte[segundo], al
+   127 000000FA E990FF                      jmp     l1
+   128                                  
+   129                                  tecla_minuto:
+   130 000000FD B408                        mov     ah, 08h
+   131 000000FF CD21                        int     21h
+   132 00000101 3C30                        cmp     al, '0'
+   133 00000103 7C50                        jl      input_invalido
+   134 00000105 3C35                        cmp     al, '5'
+   135 00000107 7F4C                        jg      input_invalido
+   136 00000109 2C30                        sub     al, '0'
+   137 0000010B B70A                        mov     bh, 10
+   138 0000010D F6E7                        mul     bh
+   139 0000010F 88C7                        mov     bh, al
+   140 00000111 B408                        mov     ah, 08h
+   141 00000113 CD21                        int     21h
+   142 00000115 3C30                        cmp     al, '0'
+   143 00000117 7C3C                        jl      input_invalido
+   144 00000119 3C39                        cmp     al, '9'
+   145 0000011B 7F38                        jg      input_invalido
+   146 0000011D 2C30                        sub     al, '0'
+   147 0000011F 00F8                        add     al, bh
+   148 00000121 A2[0700]                    mov     byte[minuto], al
+   149 00000124 E966FF                      jmp     l1
+   150                                  
+   151                                  tecla_hora:
+   152 00000127 B408                        mov     ah, 08h
+   153 00000129 CD21                        int     21h
+   154 0000012B 3C30                        cmp     al, '0'
+   155 0000012D 7C26                        jl      input_invalido
+   156 0000012F 3C32                        cmp     al, '2'
+   157 00000131 7F22                        jg      input_invalido
+   158 00000133 2C30                        sub     al, '0'
+   159 00000135 B70A                        mov     bh, 10
+   160 00000137 F6E7                        mul     bh
+   161 00000139 88C7                        mov     bh, al
+   162 0000013B B408                        mov     ah, 08h
+   163 0000013D CD21                        int     21h
+   164 0000013F 3C30                        cmp     al, '0'
+   165 00000141 7C12                        jl      input_invalido
+   166 00000143 3C39                        cmp     al, '9'
+   167 00000145 7F0E                        jg      input_invalido
+   168 00000147 2C30                        sub     al, '0'
+   169 00000149 00F8                        add     al, bh
+   170 0000014B 3C17                        cmp     al, 23
+   171 0000014D 7F06                        jg      input_invalido
+   172 0000014F A2[0800]                    mov     byte[hora], al
+   173 00000152 E938FF                      jmp     l1
+   174                                  
+   175                                  input_invalido:
+   176 00000155 BE[0401]                    mov si, msg_error
+   177 00000158 B60A                        mov dh, 10
+   178 0000015A B220                        mov dl, 32
+   179 0000015C E8D1FE                      call print_string
+   180 0000015F E92BFF                      jmp     l1
+   181                                  
+   182                                  limpar_input_invalido:
+   183 00000162 BE[1401]                    mov si, msg_clear
+   184 00000165 B60A                        mov dh, 10
+   185 00000167 B220                        mov dl, 32
+   186 00000169 E8C4FE                      call print_string
+   187 0000016C C3                          ret
+   188                                  
+   189                                  relogio:
+   190 0000016D 50                      	push	ax
+   191 0000016E 1E                      	push	ds
+   192 0000016F B8[0000]                	mov     ax,data	
+   193 00000172 8ED8                    	mov     ds,ax	
+   194                                      
+   195 00000174 FE06[0500]                  inc	byte [tique]
+   196 00000178 803E[0500]12                cmp	byte[tique], 18	
+   197 0000017D 7235                        jb		Fimrel
+   198 0000017F C606[0500]00            	mov byte [tique], 0
+   199 00000184 FE06[0600]              	inc byte [segundo]
+   200 00000188 803E[0600]3C            	cmp byte [segundo], 60
+   201 0000018D 7225                    	jb   	Fimrel
+   202 0000018F C606[0600]00            	mov byte [segundo], 0
+   203 00000194 FE06[0700]              	inc byte [minuto]
+   204 00000198 803E[0700]3C            	cmp byte [minuto], 60
+   205 0000019D 7215                    	jb   	Fimrel
+   206 0000019F C606[0700]00            	mov byte [minuto], 0
+   207 000001A4 FE06[0800]              	inc byte [hora]
+   208 000001A8 803E[0800]18            	cmp byte [hora], 24
+   209 000001AD 7205                    	jb   	Fimrel
+   210 000001AF C606[0800]00            	mov byte [hora], 0	
+   211                                  Fimrel:
+   212 000001B4 B020                        mov		al,20h
+   213 000001B6 E620                    	out		20h,al
+   214 000001B8 1F                      	pop		ds
+   215 000001B9 58                      	pop		ax
+   216 000001BA CF                      	iret
+   217                                  	
+   218                                  converte:
+   219 000001BB 50                          push 	ax
+   220 000001BC 1E                      	push    ds
+   221 000001BD B8[0000]                	mov     ax, data
+   222 000001C0 8ED8                    	mov     ds, ax
+   223 000001C2 30E4                    	xor 	ah, ah
+   224 000001C4 B30A                    	MOV     BL, 10
+   225 000001C6 A0[0600]                	mov 	al, byte [segundo]
+   226 000001C9 F6F3                        DIV     BL
+   227 000001CB 0430                        ADD     AL, 30h                                                                                          
+   228 000001CD A2[0F00]                    MOV     byte [horario+6], AL
+   229 000001D0 80C430                      ADD     AH, 30h
+   230 000001D3 8826[1000]                  mov 	byte [horario+7], AH
+   231                                      
+   232 000001D7 30E4                    	xor 	ah, ah
+   233 000001D9 A0[0700]                	mov 	al, byte [minuto]
+   234 000001DC F6F3                        DIV     BL
+   235 000001DE 0430                        ADD     AL, 30h                                                                                          
+   236 000001E0 A2[0C00]                    MOV     byte [horario+3], AL
+   237 000001E3 80C430                      ADD     AH, 30h
+   238 000001E6 8826[0D00]                  mov 	byte [horario+4], AH
+   239                                  	
+   240 000001EA 30E4                    	xor 	ah, ah
+   241 000001EC A0[0800]                	mov 	al, byte [hora]
+   242 000001EF F6F3                        DIV     BL
+   243 000001F1 0430                        ADD     AL, 30h                                                                                          
+   244 000001F3 A2[0900]                    MOV     byte [horario], AL
+   245 000001F6 80C430                      ADD     AH, 30h
+   246 000001F9 8826[0A00]                  mov 	byte [horario+1], AH
+   247                                  
+   248 000001FD B402                        mov ah, 02h
+   249 000001FF B700                        mov bh, 0
+   250 00000201 B608                        mov dh, 8
+   251 00000203 B224                        mov dl, 36
+   252 00000205 CD10                        int 10h
+   253                                  
+   254 00000207 B409                    	mov 	ah, 09h
+   255 00000209 BA[0900]                	mov 	dx, horario
+   256 0000020C CD21                    	int 	21h
+   257                                  
+   258 0000020E 1F                      	pop     ds
+   259 0000020F 58                      	pop     ax
+   260 00000210 C3                      	ret  
+   261                                  
+   262                                  segment data
+   263                                  	eoi     	EQU 20h
+   264                                      intr	   	EQU 08h
+   265 00000000 00                      	char		db	0
+   266 00000001 0000                    	offset_dos	dw	0
+   267 00000003 0000                    	cs_dos		dw	0
+   268 00000005 00                      	tique		db  0
+   269 00000006 00                      	segundo		db  0
+   270 00000007 00                      	minuto 		db  0
+   271 00000008 00                      	hora 		db  0
+   272 00000009 00003A00003A000020-     	horario		db  0,0,':',0,0,':',0,0,' ', 13,'$'
+   273 00000012 0D24               
+   274 00000014 544C5F323032342F31-         msg_title db 'TL_2024/1, Breno Uliana de Angelo, Sistemas Embarcados I.', 0
+   275 0000001D 2C204272656E6F2055-
+   276 00000026 6C69616E6120646520-
+   277 0000002F 416E67656C6F2C2053-
+   278 00000038 697374656D61732045-
+   279 00000041 6D6261726361646F73-
+   280 0000004A 20492E00           
+   281 0000004E 4D656E752064652074-         msg_menu db 'Menu de teclas:', 0
+   282 00000057 65636C61733A00     
+   283 0000005E 713A207361697200            msg_q db 'q: sair', 0
+   284 00000066 733A2070617261206F-         msg_s db 's: para o contador dos segundos e aguarda novo valor.', 0
+   285 0000006F 20636F6E7461646F72-
+   286 00000078 20646F732073656775-
+   287 00000081 6E646F732065206167-
+   288 0000008A 7561726461206E6F76-
+   289 00000093 6F2076616C6F722E00 
+   290 0000009C 6D3A2070617261206F-         msg_m db 'm: para o contador dos minutos e aguarda novo valor.', 0
+   291 000000A5 20636F6E7461646F72-
+   292 000000AE 20646F73206D696E75-
+   293 000000B7 746F73206520616775-
+   294 000000C0 61726461206E6F766F-
+   295 000000C9 2076616C6F722E00   
+   296 000000D1 683A2070617261206F-         msg_h db 'h: para o contador das horas e aguarda novo valor.', 0
+   297 000000DA 20636F6E7461646F72-
+   298 000000E3 2064617320686F7261-
+   299 000000EC 732065206167756172-
+   300 000000F5 6461206E6F766F2076-
+   301 000000FE 616C6F722E00       
+   302 00000104 496E70757420496E76-         msg_error db 'Input Invalido!', 0
+   303 0000010D 616C69646F2100     
+   304 00000114 20<rept>                    msg_clear times 60 db ' '
+   305 00000150 00                          db 0
+   306                                  
+   307                                  segment stack stack
+   308 00000000 <res 00000100>              resb 256
+   309                                  stacktop:
